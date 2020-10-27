@@ -43,13 +43,13 @@ JSLookup = {JS_TestLogicReset:'TestLogicReset', JS_RunTestIdle:'RunTestIdle', JS
 
 class Decoder(srd.Decoder):
 	api_version = 3
-	id = 'mchpjtag'
-	name = 'MCHP_JTAG'
+	id = 'pic32_jtag'
+	name = 'PIC32-JTAG'
 	longname = 'Microchip PIC32 JTAG'
 	desc = 'PIC32 programming protocol-'
 	license = 'gplv2+'
 	inputs = ['logic']
-	outputs = ['mchpjtag']
+	outputs = ['pic32_jtag']
 	channels = (
 		{'id': 'reset', 'name': 'SYSRST', 'desc': 'Reset line'},
 		{'id': 'tms', 'name': 'TMS', 'desc': 'Test Mode Select'},
@@ -120,11 +120,12 @@ class Decoder(srd.Decoder):
 		self.startSampleExitTwo = 0
 		self.startSampleUpdate = 0
 
-	def varResetOnX(self):
+	# Now required
+	def reset(self):
 		pass
 
 	def decode(self):
-		print("HERE 2");
+		#print("HERE 2");
 		
 		while True:
 			#time.sleep(0.01)
@@ -324,12 +325,15 @@ class Decoder(srd.Decoder):
 						stringsToPrint.append([self.startSampleShiftData, self.out_ann, [4, ['COMMAND_DR: ' + MTAP_COMMAND_DR[self.valueTDI]]]])	
 					else:
 						stringsToPrint.append([self.startSampleShiftData, self.out_ann, [4, ['COMMAND_DR: Unknown :( ' + str(hex(self.valueTDI))]]])
-				elif (self.clockCycles == 32):
-					# Just normal data
-					stringsToPrint.append([self.startSampleShiftData, self.out_ann, [5, ['Normal data transfer']]])
 				elif (self.selectedRegister == ETAP_FASTDATA):	# Could check for 33 bits
 					# FAST DATA
-					stringsToPrint.append([self.startSampleShiftData, self.out_ann, [5, ['Fast data transfer TDI:' +  str(hex(self.valueTDI>>1))  + ' TDO: ' + str(hex(self.valueTDO>>1)) ]]])
+					stringsToPrint.append([self.startSampleShiftData, self.out_ann,\
+							[5, ['Fast data transfer TDI: ' +  str(hex(self.valueTDI>>1))  + ' TDO: ' + str(hex(self.valueTDO>>1))\
+							+ ' PrAcc PIC: ' + str(hex(self.valueTDO & 0x01)) + 'PrAcc PROBE: ' + str(hex(self.valueTDI & 0x01))  ]]])	
+				#elif (self.clockCycles == 32):
+				else:
+					# Just normal data
+					stringsToPrint.append([self.startSampleShiftData, self.out_ann, [5, ['Normal data transfer TDI: ' +  str(hex(self.valueTDI))  + ' TDO: ' + str(hex(self.valueTDO)) ]]])
 ### End decoding
 
 				if (0 == tms):
@@ -371,171 +375,5 @@ class Decoder(srd.Decoder):
 				self.startSampleUpdate = self.samplenum
 
 ###############################################################################
-
-'''
-			print("STATE IS: " + str(self.state))
-			if (self.state == STATE_PRE_RESET):
-				# RESET asserted
-				conds.append({PIN_RESET: 'f'})	# On falling edge
-				
-				self.state = STATE_RESET
-				self.put(self.startSample, self.samplenum, self.out_ann, [7, ['Dunno']])
-				self.onResetAsserted()
-				continue
-
-			elif (self.state == STATE_RESET):
-				print("Here 4")
-				conds.append({PIN_RESET: 'r'})
-				conds.append({PIN_CLOCK: 'r'})	# On rising edge of clock, latch value. On rising edge of reset, go to next state
-				reset, clock, data = self.wait(conds)
-				print("HEre 5, " + str(reset) + " " + str(clock) + " " + str(data));
-				print("Current vals: " + str(self.value) + " CC: " + str(self.clockCycles)) 
-				if (reset == 0 and clock == 1):
-					print("Hello?")
-					if (self.clockCycles == 0):
-						self.startSample = self.samplenum
-					self.value = (self.value << 1) + data
-					self.clockCycles =  self.clockCycles + 1
-					
-				if (reset == 1):
-					print("Here 3")
-					if (self.enteredICSP == 0):
-						if (self.clockCycles == 32 and self.value == 0x4D434850):					
-							self.state = STATE_POST_RESET
-							self.onResetDeasserted()
-							self.enteredICSP = 1
-							continue
-					else:
-						self.onResetDeasserted()
-						self.startSample = self.samplenum
-						self.state = STATE_POST_RESET
-					
-				if (self.clockCycles == 32 and self.value == 0x4D434850):	# If value was MCHP
-					self.put(self.startSample, self.samplenum, self.out_ann, [1, ['ICSP ENTER']])
-					self.startSample = self.samplenum
-
-				
-				
-
-				# Value is shifted MSB first!
-				
-				
-			elif (self.state > STATE_RESET):
-				
-				if (self.subClockCycles == 3):	# Trigger on rising on fourth edge, else falling
-					conds.append({ PIN_CLOCK: 'r'})
-				else:
-					conds.append({ PIN_CLOCK: 'f'})
-				conds.append({PIN_RESET: 'f'})	# Handle rouge resets.
-				
-				reset, clock, data = self.wait(conds)
-				print("Hi from 12, " + str(reset) + " " + str(clock) + " " + str(data))
-					
-				if (reset == 0):
-					self.state = STATE_RESET
-					self.onResetAsserted()
-					self.startSample = self.samplenum
-					continue
-
-				## Quick fix for display alignment
-				if (self.clockCycles == 0 and self.subClockCycles == 0):
-					self.startSample = self.samplenum
-
-				if (self.subClockCycles == 0):
-					# Data is fed LSB ><
-					if (data):
-						self.valueTDI = self.valueTDI | (1<<self.clockCycles)
-					self.subClockCycles = self.subClockCycles + 1
-
-				elif (self.subClockCycles == 1):
-					self.valueTMS = (self.valueTMS << 1) + data
-					self.subClockCycles = self.subClockCycles + 1
-
-				elif (self.subClockCycles == 2):
-					self.subClockCycles = self.subClockCycles + 1
-
-				elif (self.subClockCycles == 3):
-					# Data is fed LSB ><
-					if (data):
-						self.valueTDO = self.valueTDO | (1<<self.clockCycles)
-					self.subClockCycles = self.subClockCycles + 1
-
-				elif (self.subClockCycles == 4):
-					# After the last clock edge					
-					self.subClockCycles = 0
-					self.clockCycles = self.clockCycles + 1
-
-
-					
-					print("TMS value: " + str(self.valueTMS) + " ClockCycles: " + str(self.clockCycles))
-					if (self.clockCycles > 4):
-						self.valueTMSstart = (self.valueTMS >> (self.clockCycles - 4))	# Get TMS value at the beginning
-						self.valueTMSstop = self.valueTMS & 0x07						# Get TMS value at the end
-						print("TMS stop value: " + str(self.valueTMSstop) + " Start value: " + str(self.valueTMSstart))
-
-						if (self.valueTMSstop == 0x06 and self.clockCycles > 4):		# End of command/instruciton/reset...
-							if ((self.valueTMS & 0x3F) == 0x3E):						# Check for TAP reset (6b'111110), done on raw variable
-								# This was a TAP reset packet. Select default command (IDCODE), in whichever TAP we are
-								self.put(self.startSample, self.samplenum, self.out_ann, [8, ['TAP reset']])
-								self.selectedRegister = E_MTAP_IDCODE
-								self.onResetDeasserted()	
-					
-							elif(self.valueTMSstart == 	0x0C):
-								# If TMS value is 4b'1100, then it's a command
-								print("Got outselves a command!")
-								print("Raw TDI value is " + str(self.valueTDI))
-								print("Number of clocks at this point " + str(self.clockCycles))
-								tempValueSent = self.valueTDI >> 4 # Cut off TMS HEADER. Damn LSBs
-								tempValueSent = tempValueSent & ((2**((self.clockCycles - 2 - 4))) - 1 )	# -2 for cut off footer, -4 for command header
-								print("Command probably: " + str(tempValueSent))
-								
-								if (tempValueSent not in INSTRUCTIONS):
-									self.put(self.startSample, self.samplenum, self.out_ann, [7, ['Unknown command: ' + str(hex(tempValueSent))]])								
-								else:
-									if (self.selectedTAP == ETAP):
-										self.put(self.startSample, self.samplenum, self.out_ann, [2, ['ETAP COMMAND: ' + INSTRUCTIONS[tempValueSent]]])
-									else:
-										self.put(self.startSample, self.samplenum, self.out_ann, [3, ['MTAP COMMAND: ' + INSTRUCTIONS[tempValueSent]]])
-									if (tempValueSent == MTAP_SW_ETAP):
-										self.selectedTAP = ETAP
-									elif(tempValueSent == MTAP_SW_MTAP):
-										self.selectedTAP = MTAP
-									
-									self.selectedRegister = tempValueSent
-											
-								self.onResetDeasserted()	
-
-							elif(self.valueTMSstart == 	0x08):	# Should be more bit shifted. Eh. TODO later
-								# If TMS value is 3b'100
-								tempValueSent = self.valueTDI >> 3 # Cut off TMS HEADER. Damn LSBs
-								tempValueSent = tempValueSent & ((2**((self.clockCycles - 2 - 3))) - 1 )	# -2 for cut off footer, -4 for command header
-								tempValueReceived = self.valueTDO >> 3 # Cut off TMS HEADER. Damn LSBs
-								tempValueReceived = tempValueReceived & ((2**((self.clockCycles - 2 - 3))) - 1 )	# -2 for cut off footer, -4 for command header
-								print("Data sent was: " + str(tempValueSent) + " Data received was: " + str(tempValueReceived))
-
-								if(self.selectedRegister == ETAP_FASTDATA):
-								# Nope, because Pickit3 does 37 cycles, that [DELETED]
-								#if (self.clockCycles == 38):	
-								#	# 3+1+32+2
-									print("Ping, doing XferFastData!")
-									self.put(self.startSample, self.samplenum, self.out_ann, [6, ['FAST data ' + str(self.clockCycles - 2 - 4) + 'b, Sent: ' + str(hex(tempValueSent)) + ' Recvd: ' + str(hex(tempValueReceived))]])
-									self.selectedRegister = E_MTAP_IDCODE
-
-								else:
-									print("Pong, doin XferData")
-									
-
-									if (self.selectedRegister == MTAP_COMMAND):
-										if (tempValueSent in MTAP_COMMAND_DR):
-											self.put(self.startSample, self.samplenum, self.out_ann, [4, ['COMMAND_DR: ' + MTAP_COMMAND_DR[tempValueSent]]])	
-										else:
-											self.put(self.startSample, self.samplenum, self.out_ann, [4, ['COMMAND_DR: Unknown :( ' + str(hex(tempValueSent))]])	
-									else:
-										self.put(self.startSample, self.samplenum, self.out_ann, [5, ['Data ' + str(self.clockCycles - 2 - 4) + 'b, Sent: ' + str(hex(tempValueSent)) + ' Recvd: ' + str(hex(tempValueReceived))]])								
-
-								#time.sleep(5)
-								self.onResetDeasserted()					
-'''
-
 
 	
