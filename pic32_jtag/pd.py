@@ -288,7 +288,9 @@ class Decoder(srd.Decoder):
 					stringsToPrint.append([self.startSampleShiftData, self.out_ann, [5, ['Normal data transfer']]])
 				elif (self.selectedRegister == ETAP_FASTDATA):	# Could check for 33 bits
 					# FAST DATA
-					stringsToPrint.append([self.startSampleShiftData, self.out_ann, [5, ['Fast data transfer TDI:' +  str(hex(self.valueTDI>>1))  + ' TDO: ' + str(hex(self.valueTDO>>1)) ]]])
+					stringsToPrint.append([self.startSampleShiftData, self.out_ann,\
+					[5, ['Fast data transfer TDI: ' +  str(hex(self.valueTDI>>1))  + ' TDO: ' + str(hex(self.valueTDO>>1))\
+					+ ' PrAcc PIC: ' + str(hex(self.valueTDO & 0x01)) + ' PrAcc PROBE: ' + str(hex(self.valueTDI & 0x01))  ]]])	
 ### End decoding
 				
 				if (0 == tms):
