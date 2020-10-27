@@ -11,8 +11,24 @@ The JTAG decoder should be fairly complete. It was used to check what a combinat
 
 ## ICSP
 
-The ICSP decoder was written first, and it shows.
+The ICSP decoder has been updated to the same level as the JTAG one. You can now see all the different JTAG states the controller goes through.
 
-The code is hardcoded to a specific number of cycles, which isn't great. Currently it's left as it was used last - for the Pickit 3. Pickit3 only does 32bits in a 33bit transaction (XferFastData), skipping one (the PrAcc bit).
+Originally this was written first, and then slightly modified, since Pickit 3 seemed to skip a cycle in XferFastData (PrAcc?). Looking at it now, I can't reproduce that error.
 
-TODO - remake to JTAG-level, with proper JTAG states, not just hardcoded cycles.
+## Installation instruction
+
+Either copy the pic32_jtag & pic32_icsp folder to where the decoders are located (`/usr/share/libsigrokdecode/decoders` under Ubuntu), or create a symlink. Both work just fine.
+
+## Pictures
+
+Provided are some pictures of the decoders in action
+
+### ICSP
+![alt text](Pictures/ICSP_MZ_Pickit_3_Progyon.png "ICSP, Pickit3, Progyon")
+
+### JTAG
+![alt text](Pictures/JTAG_MZ_NFXX_Progyon.png "JTAG, NFXX FTDI probe, Progyon")
+
+## Test data
+
+There is some test data available in the `Test data` folder. All represent flashing some FW onto a PIC32MZ chip, and should be the same. (Or at least the Progyon versions are both the same, MPLAB might have a minor difference). 
